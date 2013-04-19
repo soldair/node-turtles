@@ -1,60 +1,44 @@
 var dnode = require('dnode');
 var duplex = require('duplex');
 
-var streamId = 0;
-
 module.exports = function(cons,opts){
 
     opts = opts||{};
+    cons = cons||{};
 
-    var remote;
-    var remoteq = [];
-    var id = 0;
-    var streams = {};
-    var remoteStreams = {};
-    var streamSecretProperty = opts.secretProperty||"im a stream";
-    // turtleBuffers need turtle buffer limits.
-    var turtleBuffers = {};
-
-    var _streamId = ++streamId;
+    var remote
+    , remoteq = []
+    , id = 0
+    , streams = {}
+    , remoteStreams = {}
+    , streamSecretProperty = opts.secretProperty||"im a stream"
+    // turtleBuffers are data/end events sent to the stream before it has arrived on the remote.
+    // they may need turtle buffer limits but because the stream is paused they should never get more than one data event.
+    , turtleBuffers = {}
     
-    var log = function(){
-      //var args = [].slice.call(arguments);
-      //args.unshift('s'+_streamId+': ');
-      //console.log.apply(console,args);
-    }
-    
-    cons._turtles = function(yourstream,id,ev,data){
+    cons._turtles = function(yourstream,id,ev,data,cb){
 
-      log('turtles called!',yourstream?'local':'remote',id,ev,data);
       var s;
-
-      if(!id) {
-        return log('empty id passed to turtles');
-      }
+      if(!id) return;//missing id
 
       if(yourstream) {
         s = streams[id];
         if(!s) {
-          log('no local stream with id',id);
+          //no local stream with id
           return remote._turtles(yourstream?false:true,id,'end');
         }
       } else {
         s = remoteStreams[id];
-        if(!s) {
-            return log('this stream has been destroyed on this side or has never existed.',id);
-        }
+        //this stream has been destroyed on this side or has never been.
+        if(!s) return;
       }
 
       if(ev === 'turtle' && !s._connected) {
         // the remote end now has this stream.
         s._connected = true;
         if(turtleBuffers[id]) {
-          log('draining turtle buffer');
           while(turtleBuffers[id].length){
             var _args = turtleBuffers[id].shift();
-            log('drain ',_args);
-            //s.emit.apply(s,_args);
             remote._turtles(false,id,_args[0],_args[1]);
           }
           delete turtleBuffers[id];
@@ -88,7 +72,8 @@ module.exports = function(cons,opts){
       return stream(true,++id); 
     };
 
-    // expose collection of streams.
+    // expose collections of streams and buffers just in case.
+    // these are not offical api and may be altered in a patch version.
     d._streams = streams;
     d._remoteStreams = remoteStreams;
     d._turtleBuffers = turtleBuffers;
@@ -100,17 +85,16 @@ module.exports = function(cons,opts){
 
           if(arguments[i] && arguments[i][streamSecretProperty]){
             if(arguments[i].serialized) {
-              //arguments[i] = hydrateStream(arguments[i]);
+
               var _id = arguments[i].stream;
-
-              log('making stream ',arguments[i]);
-
               arguments[i] = stream(false,arguments[i].stream);
+
               //  tell the remote i got the stream and i want buffered events
               // but defer it to next tick so you can bind listeners.
               process.nextTick(function(){
                 remote._turtles(true,_id,'turtle');
               });
+
             } else {
               arguments[i] = serializeStream(arguments[i]);
             }
@@ -143,13 +127,13 @@ module.exports = function(cons,opts){
       s[streamSecretProperty] = _id;
 
       if(!local){
+        //create remote stream
         s[streamSecretProperty+' remote'] = 1;
         remoteStreams[_id] = s;
         s._connected = true;
-        log('created remote stream',_id);
       } else {
+        //create local stream
         streams[_id] = s;
-        log('created local stream',_id);
         // this always starts paused so piped streams pause
         // when the remote grabs it it passes a 'turtle' event back so the show can get started.
         s._pause();
@@ -166,10 +150,10 @@ module.exports = function(cons,opts){
           var args = [].slice.call(arguments);
           if(this._connected) {
             args.unshift.apply(args,[local?false:true,_id,ev.replace('_','')]);
-            log('calling remote with: ',args);
+            //calling remote with args
             remote._turtles.apply(remote,args);
           } else if(ev === '_data' || ev === '_end') {
-            log("buffering ",ev,' with args ',arguments);
+            //buffering ev because the remote doesnt have this stream yet.
             if(!turtleBuffers[_id]) turtleBuffers[_id] = [];
             args.unshift(ev.replace('_',''));
             turtleBuffers[_id].push(args);
@@ -204,7 +188,6 @@ module.exports = function(cons,opts){
       });
 
       return s;
- 
     }
 
     return d;
