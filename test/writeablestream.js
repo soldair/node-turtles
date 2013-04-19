@@ -12,7 +12,7 @@ test("can be just a writable stream",function(t){
       var data = '';
 
       s.on('data',function(d){
-
+        console.log('ZZ> ',d);
         data += d;
         t.ok(d,'should have data in data event');
 
@@ -47,6 +47,7 @@ test("can be just a writable stream",function(t){
 
       var ended = 0;
       s.on('end',function(){
+        console.log('UU< end');
         ended++;
       }).on('close',function(){
 

@@ -21,35 +21,41 @@ module.exports = function(cons,opts){
     var log = function(){
       var args = [].slice.call(arguments);
       args.unshift('s'+_streamId+': ');
-      console.log.apply(console,args);
+      //console.log.apply(console,args);
     }
     
     cons._turtles = function(yourstream,id,ev,data){
 
       log('turtles called!',yourstream?'local':'remote',id,ev,data);
       var s;
-      if(yourstream) {
 
+      if(!id) {
+        return log('empty id passed to turtles');
+      }
+
+      if(yourstream) {
         s = streams[id];
-        log("----local stream! ",ev);
-        
+        if(!s) {
+          log('no local stream with id',id);
+          return remote._turtles(yourstream?false:true,id,'end');
+        }
       } else {
         s = remoteStreams[id];
-        log('REMOTE STREAM WOO!',ev);
+        if(!s) {
+            return log('this stream has been destroyed on this side or has never existed.',id);
+        }
       }
 
-      if(!s) {
-        log('this stream has been destroyed on this side or has never existed.',id);
-        return remote._turtles(yourstream?false:true,id,'end');
-      }
-
-      if(ev === 'turtle' && !s.connected) {
+      if(ev === 'turtle' && !s._connected) {
         // the remote end now has this stream.
         s._connected = true;
         if(turtleBuffers[id]) {
           log('draining turtle buffer');
           while(turtleBuffers[id].length){
-            s.emit.apply(s,turtleBuffers[id].shift());
+            var _args = turtleBuffers[id].shift();
+            log('drain ',_args);
+            //s.emit.apply(s,_args);
+            remote._turtles(false,id,_args[0],_args[1]);
           }
           delete turtleBuffers[id];
         }
@@ -94,7 +100,17 @@ module.exports = function(cons,opts){
 
           if(arguments[i] && arguments[i][streamSecretProperty]){
             if(arguments[i].serialized) {
-              arguments[i] = hydrateStream(arguments[i]);
+              //arguments[i] = hydrateStream(arguments[i]);
+              var _id = arguments[i].stream;
+
+              log('making stream ',arguments[i]);
+
+              arguments[i] = stream(false,arguments[i].stream);
+              //  tell the remote i got the stream and i want buffered events
+              // but defer it to next tick so you can bind listeners.
+              process.nextTick(function(){
+                remote._turtles(true,_id,'turtle');
+              });
             } else {
               arguments[i] = serializeStream(arguments[i]);
             }
@@ -111,7 +127,8 @@ module.exports = function(cons,opts){
       var id = stream[streamSecretProperty];
       var remote = stream[streamSecretProperty+' remote'];
       if(remote) {
-        throw new Error('please dont re serialize remote streams. pipe local first if you must');
+        remote.emit('error',new Error('please dont re serialize remote streams. pipe local first if you must'));
+        return;
       }
       
       var o = {stream:id,serialized:true};
@@ -120,15 +137,15 @@ module.exports = function(cons,opts){
 
     }
 
-
     function stream(local,_id,data,end){
-      var s = duplex(data,end);
-      var _id = s[streamSecretProperty] = ++id;
+       var s = duplex(data,end);
 
       s[streamSecretProperty] = _id;
+
       if(!local){
         s[streamSecretProperty+' remote'] = 1;
         remoteStreams[_id] = s;
+        s._connected = true;
         log('created remote stream',_id);
       } else {
         streams[_id] = s;
@@ -144,58 +161,51 @@ module.exports = function(cons,opts){
       // like the above but for read.
       s._read = false;
       
-      //var emit = s.emit;
-      //s.emit = function(ev){
-      //  s.emit.call('')
-      //}
-
-      s.on('_data',function(data){
-        this._written = true;
-        if(this._connected) {
-          remote._turtles(false,_id,'data',data);
-        } else {
-          if(!turtleBuffers[_id]) turtleBuffers[_id] = [];
+      var on = function(s,ev){
+        s.on(ev,function(){
           var args = [].slice.call(arguments);
-          args.unshift('_data');
-          turtleBuffers[_id].push(args);
-        }
-      }).on('_pause',function(){
-
-        remote._turtles(false,_id,'pause');
-
-      }).on('_drain',function(){
-
-        remote._turtles(false,_id,'drain');
-
-      }).on('_end',function(data){
-
-        if(this._connected) {
-          remote._turtles(false,_id,'end',data);
-          if(!this._read) {
-            log('I HAVE NEVER BEEN READ IM CLOSING MY READ SIDE');
-            // i was the write side of a through stream. lets close the read side.
-            this._end();
+          if(this._connected) {
+            args.unshift.apply(args,[local?false:true,_id,ev.replace('_','')]);
+            log('calling remote with: ',args);
+            remote._turtles.apply(remote,args);
+          } else if(ev === '_data' || ev === '_end') {
+            log("buffering ",ev,' with args ',arguments);
+            if(!turtleBuffers[_id]) turtleBuffers[_id] = [];
+            args.unshift(ev.replace('_',''));
+            turtleBuffers[_id].push(args);
           }
-        } else {
-          if(!turtleBuffers[_id]) turtleBuffers[_id] = [];
-          var args = [].slice.call(arguments);
-          args.unshift('_end');
-          turtleBuffers[_id].push(args);
-        }
+        });
+      }
+
+      on(s,'_data');
+      on(s,'_pause');
+      on(s,'_drain');
+      on(s,'_end');
+
+      s.once('_data',function(ev){
+        this._written = true;
+      }).once('data',function(){
+        this._read = true;
       }).on('end',function(){
         if(!this._written) {
           this.end();
         }
+      }).on('_end',function(){
+        if(!this._read) {
+          this._end();
+        }
       }).on('close',function(){
-        delete turtleBuffers[_id];
-        delete streams[_id];
-      }).once('data',function(){
-        this._read = true;
+        if(local) {
+          delete turtleBuffers[_id];
+          delete streams[_id];
+        } else {
+          delete remoteStreams[_id];
+        }
       });
 
       return s;
+ 
     }
-    
     function hydrateStream(opts){
       var s = duplex();
       s[streamSecretProperty] = opts.stream||' ';
