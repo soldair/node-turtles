@@ -1,19 +1,5 @@
-
-turtles
-============
-
-image of a turtle with other turtles comming out of its eye lasers here.
-
-adds stream passing support for dnode callbacks 
-
-example
-=======
-
-dnode over dnode
-
-```js
 var test = require('tap').test;
-var turtles = require('turtles');
+var turtles = require('../index');
 
 test("can do dnode over dnode",function(t){
   t.plan(2);
@@ -79,6 +65,3 @@ test("can do dnode over dnode",function(t){
 
   oneTurtle.pipe(twoTurtle).pipe(oneTurtle);
 });
-```
-
-

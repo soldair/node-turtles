@@ -19,8 +19,8 @@ module.exports = function(cons,opts){
     var _streamId = ++streamId;
     
     var log = function(){
-      var args = [].slice.call(arguments);
-      args.unshift('s'+_streamId+': ');
+      //var args = [].slice.call(arguments);
+      //args.unshift('s'+_streamId+': ');
       //console.log.apply(console,args);
     }
     
