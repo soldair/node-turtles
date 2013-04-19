@@ -5,11 +5,12 @@
 turtles
 =======
 
-![turtles: callback streams for dnode](img/turtle-eyelasers.png)
+![turtles: callback streams for dnode](https://raw.github.com/soldair/node-turtles/master/img/turtle-eyelasers.png)
 
-adds stream passing support for [dnode](https://github.com/substack/dnode) callbacks. i use it with dnode on top of [shoe](https://github.com/substack/shoe).
-
+Adds stream passing support for [dnode](https://github.com/substack/dnode) callbacks. i use it with dnode on top of [shoe](https://github.com/substack/shoe).
 readable/writeable/duplex stream support in one!
+
+For those unfamiliar with dnode. dnode is a really great way to treat your server like a module.
 
 examples
 ========
@@ -46,7 +47,7 @@ t2.pipe(t1).pipe(t2);
 api
 ===
 
-the api extends dnode with exactlly one method
+the api extends dnode with exactly one method
 
 turtles.stream()
   - returns a duplex stream
@@ -61,7 +62,7 @@ the api reserves the name of one callback _turtles
 thanks
 ======
 
-@substack for making awesome stuff!
+@substack for making awesome stuff! and for hopefully giving me permission to use the turtle picture.
 
 inception!
 ==========
