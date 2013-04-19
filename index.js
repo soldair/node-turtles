@@ -206,56 +206,6 @@ module.exports = function(cons,opts){
       return s;
  
     }
-    function hydrateStream(opts){
-      var s = duplex();
-      s[streamSecretProperty] = opts.stream||' ';
-      s[streamSecretProperty+' remote'] = 1;
-      remoteStreams[opts.stream] = s;
-
-      log('got remote stream ',s[streamSecretProperty]);
-
-      s._written = false;
-      s._read = false;
-      
-      // bind events that alter remote's state.
-      s.on('_data',function(data){
-        log('remote stream got data');
-        // local sending data
-        remote._turtles(true,s[streamSecretProperty],'data',data);
-      }).on('pause',function(){
-
-        log('remote stream got pause');
-        // local paused
-        remote._turtles(true,s[streamSecretProperty],'pause',data);
-      }).on('end',function(data){
-
-        log('remote stream got end?',data);
-        // local ended
-        remote._turtles(true,s[streamSecretProperty],'end',data);
-        if(!this._written) {
-          log('remote has not been written but read has. calling end');
-          // i was the write side of a through stream. lets close the read side.
-          this.end();
-        }
-
-      }).on('drain',function(){
-
-        log('remote stream got drain');
-
-      }).on('close',function(){
-         
-        delete remoteStreams[s[streamSecretProperty]];
-
-      });
-
-      //  tell the remote i got the stream and i want buffered events
-      // but defer it to next tick so you can bind listeners.
-      process.nextTick(function(){
-        remote._turtles(true,opts.stream,'turtle');
-      });
-      return s;
-    }
-    
 
     return d;
 }
