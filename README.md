@@ -1,13 +1,70 @@
 
+[![Build Status](https://secure.travis-ci.org/soldair/node-turtles.png)](http://travis-ci.org/soldair/node-walkdir)
+
+
 turtles
 =======
 
-image of a turtle with other turtles comming out of its eye lasers here.
+![turtles: callback streams for dnode](img/turtle-eyelasers.png)
 
-adds stream passing support for dnode callbacks 
+adds stream passing support for [dnode](https://github.com/substack/dnode) callbacks. i use it with dnode on top of [shoe](https://github.com/substack/shoe).
 
-example
-=======
+readable/writeable/duplex stream support in one!
+
+examples
+========
+
+pipe a file
+-----------
+
+```js
+
+var t1 = turtles({
+  lines:function(cb){
+    var stream = fs.createReadStream('file.txt')
+      .pipe(linestream())// parse it to lines of text
+      .pipe(this.stream());
+
+    cb(false,stream);
+  }
+});
+
+t2 = turtles();
+
+t2.on('remote',function(remote){
+    remote.lines(function(err,stream){
+      stream.on('data',function(line){
+        console.log('a line:',line);
+      })
+    });
+});
+
+t2.pipe(t1).pipe(t2);
+```
+
+
+api
+===
+
+the api extends dnode with exactlly one method
+
+turtles.stream()
+  - returns a duplex stream
+  - a stream is not cleaned up until both sides close. if you dont use one side it will be closed automatically for you.
+  - if you only read from this stream and it ends is will close the write side for you and cleanup the stream.
+  - if you only write from this stream and it ends is will close the read side for you and cleanup the stream.
+  - you may pass these as data arguments to callbacks
+
+the api reserves the name of one callback _turtles
+
+
+thanks
+======
+
+@substack for making awesome stuff!
+
+inception!
+==========
 
 dnode over dnode
 
