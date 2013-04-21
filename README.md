@@ -42,14 +42,14 @@ t2.on('remote',function(remote){
 
 t2.pipe(t1).pipe(t2);
 ```
-
+todo: shoe/engine.io-stream example
 
 api
 ===
 
 the api extends dnode with exactly one method
 
-turtles.stream()
+- turtles.stream()
   - returns a duplex stream
   - a stream is not cleaned up until both sides close. if you dont use one side it will be closed automatically for you.
   - if you only read from this stream and it ends is will close the write side for you and cleanup the stream.

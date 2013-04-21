@@ -1,7 +1,7 @@
 {
   "name": "turtles",
   "description": "adds stream passing support to dnode callbacks",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "repository": {
     "url": "git://github.com/soldair/node-turtles.git"
   },

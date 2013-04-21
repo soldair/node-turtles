@@ -16,11 +16,9 @@ module.exports = function(cons,opts){
     // they may need turtle buffer limits but because the stream is paused they should never get more than one data event.
     , turtleBuffers = {}
     
-    cons._turtles = function(yourstream,id,ev,data,cb){
-
+    cons._turtles = function(yourstream,id,ev,data){
       var s;
       if(!id) return;//missing id
-
       if(yourstream) {
         s = streams[id];
         if(!s) {
@@ -28,6 +26,7 @@ module.exports = function(cons,opts){
           return remote._turtles(yourstream?false:true,id,'end');
         }
       } else {
+
         s = remoteStreams[id];
         //this stream has been destroyed on this side or has never been.
         if(!s) return;
@@ -52,8 +51,10 @@ module.exports = function(cons,opts){
         s.emit('drain');
       } else if(ev === 'end'){
         s._end();
-      }  
-    };
+      } else if(ev === 'error' && !yourstream) {
+        s.emit('error',data);
+      } 
+    }
 
     // curry stream hydration
     Object.keys(cons).forEach(function(method){
@@ -77,6 +78,8 @@ module.exports = function(cons,opts){
     d._streams = streams;
     d._remoteStreams = remoteStreams;
     d._turtleBuffers = turtleBuffers;
+
+    return d;
 
     function streamy(cb){
       if(typeof cb !== 'function') return cb;
@@ -185,11 +188,18 @@ module.exports = function(cons,opts){
         } else {
           delete remoteStreams[_id];
         }
+      }).on('error',function(error){
+        if(local) {
+          remote._turtles(false,_id,'error',error);
+        }
+        // if this is the only listener throw.
+        if(this.listeners('error').length === 0){
+          throw error;
+        }
       });
 
       return s;
     }
 
-    return d;
 }
 
